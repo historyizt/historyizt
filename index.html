@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>История ПримИЖТ</title>
+    <title>История ПримИЖТ | Архив</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         :root {
@@ -11,6 +11,8 @@
             --accent: #3498db;
             --light: #ecf0f1;
             --danger: #e74c3c;
+            --success: #27ae60;
+            --warning: #f39c12;
         }
 
         body {
@@ -20,7 +22,6 @@
             color: #333;
         }
 
-        /* Шапка */
         header {
             background-color: var(--primary);
             color: white;
@@ -46,7 +47,6 @@
 
         h1 { margin: 0; font-size: 1.5rem; }
 
-        /* Вкладки */
         .nav-tabs {
             display: flex;
             gap: 15px;
@@ -72,7 +72,6 @@
             border-bottom-color: var(--accent);
         }
 
-        /* Сетка материалов */
         .grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
@@ -92,7 +91,7 @@
             flex-direction: column;
             align-items: center;
             text-align: center;
-            height: 160px;
+            height: 180px;
             justify-content: space-between;
         }
 
@@ -115,20 +114,30 @@
         
         .card-meta { font-size: 0.8rem; color: #7f8c8d; }
 
-        /* Админка */
-        .delete-btn {
+        /* --- Элементы Админки --- */
+        .card-actions {
             position: absolute;
             top: 10px;
             right: 10px;
-            background: var(--danger);
+            display: flex;
+            gap: 5px;
+            z-index: 2;
+        }
+
+        .action-btn {
             color: white;
             border: none;
             border-radius: 50%;
             width: 25px;
             height: 25px;
             cursor: pointer;
-            z-index: 2;
+            font-size: 0.8rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
+        .btn-del { background: var(--danger); }
+        .btn-edit { background: var(--warning); }
 
         #admin-panel {
             background: white;
@@ -136,7 +145,25 @@
             margin-top: 20px;
             border-radius: 10px;
             display: none;
-            border: 2px solid var(--accent);
+            border-top: 4px solid var(--accent);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+        }
+
+        .admin-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .logout-btn {
+            background: #95a5a6;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
         }
 
         .type-switch {
@@ -160,6 +187,26 @@
         }
 
         textarea { resize: vertical; height: 120px; }
+
+        /* Прогресс бар */
+        #progress-container {
+            display: none;
+            margin-top: 15px;
+        }
+        .progress-bar-bg {
+            width: 100%;
+            background-color: #eee;
+            border-radius: 10px;
+            height: 20px;
+            overflow: hidden;
+        }
+        .progress-bar-fill {
+            height: 100%;
+            background-color: var(--success);
+            width: 0%;
+            transition: width 0.3s;
+        }
+        #progress-text { font-size: 0.9rem; margin-top: 5px; color: #666; text-align: center; }
 
         /* Модальное окно */
         .modal-overlay {
@@ -197,7 +244,7 @@
             background: #f9f9f9;
             padding: 20px;
             border-radius: 5px;
-            white-space: pre-wrap; /* Сохраняет переносы строк */
+            white-space: pre-wrap;
             line-height: 1.6;
             margin-top: 15px;
             font-size: 1.1rem;
@@ -224,20 +271,8 @@
             font-size: 1rem;
         }
 
-        .loader {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid var(--accent);
-            border-radius: 50%;
-            width: 30px;
-            height: 30px;
-            animation: spin 1s linear infinite;
-            margin: 20px auto;
-            display: none;
-        }
+        .btn.cancel { background: #95a5a6; }
 
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
-        /* Скрытый вход */
         .secret-login {
             position: fixed;
             bottom: 0;
@@ -269,72 +304,83 @@
 <div class="container">
     <!-- ПАНЕЛЬ АДМИНИСТРАТОРА -->
     <div id="admin-panel">
-        <h3 style="margin-top: 0;">Добавить материал</h3>
+        <div class="admin-header">
+            <h3 id="form-title" style="margin:0;">Добавить материал</h3>
+            <button class="logout-btn" onclick="adminLogout()">Выйти</button>
+        </div>
         
-        <!-- Переключатель -->
-        <div class="type-switch">
-            <span>Тип загрузки:</span>
-            <label><input type="radio" name="uploadType" value="file" checked onclick="toggleInputType()"> Загрузить файл</label>
-            <label><input type="radio" name="uploadType" value="text" onclick="toggleInputType()"> Написать статью</label>
+        <!-- Переключатель режима (скрывается при редактировании) -->
+        <div class="type-switch" id="type-switch-container">
+            <span>Тип:</span>
+            <label><input type="radio" name="uploadType" value="file" checked onclick="toggleInputType()"> Загрузка файлов (можно несколько)</label>
+            <label><input type="radio" name="uploadType" value="text" onclick="toggleInputType()"> Текстовая статья</label>
         </div>
 
-        <input type="text" id="file-title" placeholder="Введите название материала">
+        <input type="text" id="file-title" placeholder="Название (для файлов это будет общим префиксом)">
         
         <select id="file-category">
-            <option value="lectures">Категория: Лекции</option>
-            <option value="extra">Категория: Доп. материалы</option>
-            <option value="tasks">Категория: Творческие задания</option>
-            <option value="method">Категория: Методические рекомендации</option>
+            <option value="lectures">Лекции</option>
+            <option value="extra">Доп. материалы</option>
+            <option value="tasks">Творческие задания</option>
+            <option value="method">Методические рекомендации</option>
         </select>
 
-        <!-- Поле для файла -->
+        <!-- Поле для ФАЙЛОВ (multiple) -->
         <div id="input-container-file">
-            <input type="file" id="file-input">
+            <input type="file" id="file-input" multiple>
+            <small style="color:#7f8c8d">Совет: Выберите сразу несколько файлов для поочередной загрузки.</small>
         </div>
 
-        <!-- Поле для текста -->
+        <!-- Поле для ТЕКСТА -->
         <div id="input-container-text" style="display: none;">
-            <textarea id="text-input" placeholder="Введите текст, описание, объявление или лекцию..."></textarea>
+            <textarea id="text-input" placeholder="Введите текст, описание или лекцию..."></textarea>
         </div>
 
-        <button class="btn" onclick="uploadMaterial()">Опубликовать</button>
-        <div id="upload-loader" class="loader"></div>
+        <div style="margin-top: 10px;">
+            <button id="submit-btn" class="btn" onclick="processSubmit()">Опубликовать</button>
+            <button id="cancel-edit-btn" class="btn cancel" style="display:none;" onclick="cancelEditMode()">Отмена</button>
+        </div>
+
+        <!-- Прогресс бар -->
+        <div id="progress-container">
+            <div id="progress-text">Загрузка...</div>
+            <div class="progress-bar-bg">
+                <div id="progress-bar-fill" class="progress-bar-fill"></div>
+            </div>
+        </div>
     </div>
 
-    <!-- Сетка с карточками -->
+    <!-- Сетка -->
     <div id="materials-grid" class="grid">
-        <p style="text-align:center; width: 100%; color: #999;">Загрузка материалов...</p>
+        <p style="text-align:center; width: 100%; color: #999;">Загрузка...</p>
     </div>
 </div>
 
-<!-- МОДАЛЬНОЕ ОКНО -->
+<!-- МОДАЛЬНОЕ ОКНО ПРОСМОТРА -->
 <div class="modal-overlay" id="modal" onclick="if(event.target === this) closeModal()">
     <div class="modal">
         <span class="close-modal" onclick="closeModal()">&times;</span>
-        <h2 id="modal-title" style="margin-top: 0;">Заголовок</h2>
-        
-        <!-- Область контента -->
+        <h2 id="modal-title" style="margin-top: 0;"></h2>
         <div id="modal-content-area"></div>
-
         <div id="modal-actions">
-            <a id="modal-download" href="#" class="btn" target="_blank">Скачать файл</a>
+            <a id="modal-download" href="#" class="btn" target="_blank">Скачать</a>
             <button class="btn" style="background: var(--primary)" onclick="shareLink()">Поделиться</button>
         </div>
     </div>
 </div>
 
-<!-- Кнопка входа -->
 <div class="secret-login" onclick="adminLogin()">π</div>
 
 <script>
-    // --- ВАЖНО: ВСТАВЬ СЮДА ССЫЛКУ С RENDER ---
-    const API_URL = "https://historyizt.onrender.com"; 
+    // ВСТАВЬ СЮДА ССЫЛКУ С RENDER (БЕЗ СЛЕША В КОНЦЕ)
+    const API_URL = "https://ТВОЙ-СЕРВЕР.onrender.com"; 
 
     let allMaterials = {};
     let currentCategory = 'lectures';
     let isAdmin = false;
+    let editModeId = null; // ID редактируемого элемента
 
-    // --- 1. Интерфейс Загрузки ---
+    // --- UI Логика ---
     function toggleInputType() {
         const type = document.querySelector('input[name="uploadType"]:checked').value;
         if (type === 'file') {
@@ -346,40 +392,34 @@
         }
     }
 
-    // --- 2. Получение данных ---
+    // --- Основной процесс ---
     async function fetchMaterials() {
-        const grid = document.getElementById('materials-grid');
         try {
             const response = await fetch(`${API_URL}/api/materials`);
-            if(!response.ok) throw new Error("Ошибка сети");
+            if(!response.ok) throw new Error("Server error");
             allMaterials = await response.json();
             renderMaterials();
             checkUrlParams();
         } catch (error) {
-            console.error(error);
-            grid.innerHTML = `<p style="text-align:center; width:100%">Сервер запускается (это может занять до 50 сек).<br>Обновите страницу через минуту.</p>`;
+            document.getElementById('materials-grid').innerHTML = 
+                `<p style="text-align:center; width:100%">Сервер запускается (до 50 сек)...<br>Попробуйте обновить страницу.</p>`;
         }
     }
 
-    // --- 3. Отрисовка карточек ---
     function renderMaterials() {
         const grid = document.getElementById('materials-grid');
         grid.innerHTML = '';
-        
-        // Превращаем объект в массив и сортируем (новые сверху)
         const items = Object.values(allMaterials || {}).sort((a,b) => b.createdAt - a.createdAt);
         const filtered = items.filter(item => item.category === currentCategory);
 
         if(filtered.length === 0) {
-            grid.innerHTML = '<p style="text-align:center; color:#999;">В этом разделе пока пусто.</p>';
+            grid.innerHTML = '<p style="text-align:center; color:#999; width:100%">Пусто</p>';
             return;
         }
 
         filtered.forEach(item => {
             const ext = item.type;
             let icon = 'fa-file';
-            
-            // Выбор иконки
             if(ext === 'text') icon = 'fa-align-left';
             else if(ext === 'pdf') icon = 'fa-file-pdf';
             else if(ext && (ext.includes('word') || ext.includes('doc'))) icon = 'fa-file-word';
@@ -389,9 +429,18 @@
             const card = document.createElement('div');
             card.className = 'card';
             
-            // HTML Карточки
+            // Кнопки админа
+            let adminActions = '';
+            if (isAdmin) {
+                adminActions = `
+                <div class="card-actions">
+                    <button class="action-btn btn-edit" onclick="startEdit('${item.id}', event)" title="Редактировать"><i class="fas fa-pencil-alt"></i></button>
+                    <button class="action-btn btn-del" onclick="deleteMaterial('${item.id}', event)" title="Удалить">×</button>
+                </div>`;
+            }
+
             card.innerHTML = `
-                ${isAdmin ? `<button class="delete-btn" onclick="deleteFile('${item.id}', event)">×</button>` : ''}
+                ${adminActions}
                 <i class="fas ${icon} card-icon"></i>
                 <div class="card-title">${item.title}</div>
                 <div class="card-meta">
@@ -399,62 +448,277 @@
                 </div>
             `;
             
-            // Клик по карточке
             card.onclick = (e) => {
-                if(!e.target.classList.contains('delete-btn')) openModal(item);
+                // Если клик не по кнопкам админа
+                if(!e.target.closest('.action-btn')) openModal(item);
             };
             grid.appendChild(card);
         });
     }
 
-    function filterMaterials(category) {
-        currentCategory = category;
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        event.target.classList.add('active');
+    // --- Обработка формы (Добавление / Редактирование) ---
+    async function processSubmit() {
+        if (editModeId) {
+            await updateMaterial();
+        } else {
+            await uploadQueue();
+        }
+    }
+
+    // --- 1. Логика Мульти-загрузки ---
+    async function uploadQueue() {
+        const titleBase = document.getElementById('file-title').value;
+        const category = document.getElementById('file-category').value;
+        const uploadType = document.querySelector('input[name="uploadType"]:checked').value;
+        const auth = localStorage.getItem('auth');
+
+        if(!titleBase) return alert("Введите название!");
+
+        // Если это текстовый пост
+        if (uploadType === 'text') {
+            const textContent = document.getElementById('text-input').value;
+            if(!textContent) return alert("Введите текст!");
+            
+            const formData = new FormData();
+            formData.append('title', titleBase);
+            formData.append('category', category);
+            formData.append('textContent', textContent);
+            formData.append('isTextPost', 'true');
+
+            await sendUploadRequest(formData, auth);
+            return;
+        }
+
+        // Если это файлы
+        const files = document.getElementById('file-input').files;
+        if(files.length === 0) return alert("Выберите файлы!");
+
+        const progressContainer = document.getElementById('progress-container');
+        const progressBar = document.getElementById('progress-bar-fill');
+        const progressText = document.getElementById('progress-text');
+        
+        progressContainer.style.display = 'block';
+
+        // Цикл по файлам (по очереди)
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            const currentNum = i + 1;
+            const total = files.length;
+
+            progressText.innerText = `Загрузка файла ${currentNum} из ${total}: ${file.name}`;
+            const percent = ((i) / total) * 100;
+            progressBar.style.width = `${percent}%`;
+
+            const formData = new FormData();
+            // Если файлов много, добавляем номер к названию, если один - оставляем как есть
+            const finalTitle = total > 1 ? `${titleBase} (${currentNum})` : titleBase;
+            
+            formData.append('title', finalTitle);
+            formData.append('category', category);
+            formData.append('file', file);
+            formData.append('isTextPost', 'false');
+
+            try {
+                await sendUploadRequest(formData, auth);
+            } catch (e) {
+                alert(`Ошибка при загрузке ${file.name}: ${e.message}`);
+            }
+        }
+
+        progressBar.style.width = '100%';
+        progressText.innerText = "Готово!";
+        setTimeout(() => {
+            progressContainer.style.display = 'none';
+            progressBar.style.width = '0%';
+            resetForm();
+            fetchMaterials();
+        }, 1000);
+    }
+
+    async function sendUploadRequest(formData, auth) {
+        const res = await fetch(`${API_URL}/api/upload`, {
+            method: 'POST',
+            headers: { 'Authorization': auth },
+            body: formData
+        });
+        if (!res.ok) throw new Error("Ошибка сервера");
+        if(editModeId === null && formData.get('isTextPost') === 'true') {
+            alert("Статья опубликована!");
+            resetForm();
+            fetchMaterials();
+        }
+    }
+
+    // --- 2. Логика Редактирования ---
+    function startEdit(id, event) {
+        event.stopPropagation();
+        const items = Object.values(allMaterials);
+        const item = items.find(i => i.id === id);
+        if(!item) return;
+
+        editModeId = id;
+        
+        // Заполняем форму
+        document.getElementById('file-title').value = item.title;
+        document.getElementById('file-category').value = item.category;
+        
+        // Меняем UI
+        document.getElementById('form-title').innerText = "Редактирование материала";
+        document.getElementById('submit-btn').innerText = "Сохранить изменения";
+        document.getElementById('cancel-edit-btn').style.display = "inline-block";
+        document.getElementById('type-switch-container').style.display = "none";
+        document.getElementById('input-container-file').style.display = "none";
+
+        if(item.type === 'text') {
+            document.getElementById('input-container-text').style.display = "block";
+            document.getElementById('text-input').value = item.content;
+        } else {
+            document.getElementById('input-container-text').style.display = "none";
+        }
+        
+        // Скроллим к форме
+        document.getElementById('admin-panel').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    async function updateMaterial() {
+        const title = document.getElementById('file-title').value;
+        const category = document.getElementById('file-category').value;
+        const content = document.getElementById('text-input').value; // Берем текст, если он есть
+        const auth = localStorage.getItem('auth');
+
+        const bodyData = { title, category };
+        
+        // Если это был текстовый пост, обновляем и текст
+        // Определяем тип по UI (если поле текста видимо)
+        if(document.getElementById('input-container-text').style.display !== 'none') {
+             bodyData.content = content;
+        }
+
+        try {
+            const res = await fetch(`${API_URL}/api/edit/${editModeId}`, {
+                method: 'PUT',
+                headers: { 
+                    'Authorization': auth,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(bodyData)
+            });
+            
+            if(res.ok) {
+                alert("Обновлено!");
+                cancelEditMode();
+                fetchMaterials();
+            } else {
+                alert("Ошибка обновления");
+            }
+        } catch (e) {
+            alert("Ошибка сети");
+        }
+    }
+
+    function cancelEditMode() {
+        editModeId = null;
+        resetForm();
+    }
+
+    function resetForm() {
+        document.getElementById('file-title').value = '';
+        document.getElementById('file-input').value = '';
+        document.getElementById('text-input').value = '';
+        
+        // Возвращаем UI в режим добавления
+        document.getElementById('form-title').innerText = "Добавить материал";
+        document.getElementById('submit-btn').innerText = "Опубликовать";
+        document.getElementById('cancel-edit-btn').style.display = "none";
+        document.getElementById('type-switch-container').style.display = "flex";
+        toggleInputType(); // Сброс видимости полей
+    }
+
+    // --- 3. Логика Удаления (Синхронно) ---
+    async function deleteMaterial(id, event) {
+        event.stopPropagation();
+        if(!confirm("Вы уверены? Файл удалится из архива навсегда.")) return;
+        
+        const auth = localStorage.getItem('auth');
+        try {
+            const res = await fetch(`${API_URL}/api/delete/${id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': auth }
+            });
+            if(res.ok) {
+                fetchMaterials();
+            } else {
+                alert("Ошибка удаления");
+            }
+        } catch (e) {
+            alert("Ошибка сети");
+        }
+    }
+
+    // --- Авторизация ---
+    function adminLogin() {
+        const login = prompt("Логин:");
+        if (!login) return;
+        const pass = prompt("Пароль:");
+        
+        if(login === "Gaponenko" && pass === "GaponenkoJ") {
+            isAdmin = true;
+            document.getElementById('admin-panel').style.display = 'block';
+            localStorage.setItem('auth', `${login}:${pass}`);
+            renderMaterials();
+        } else {
+            alert("Ошибка");
+        }
+    }
+
+    function adminLogout() {
+        localStorage.removeItem('auth');
+        isAdmin = false;
+        document.getElementById('admin-panel').style.display = 'none';
         renderMaterials();
     }
 
-    // --- 4. Модальное окно ---
+    // --- Модальное окно и прочее ---
     function openModal(item) {
         const modal = document.getElementById('modal');
         document.getElementById('modal-title').innerText = item.title;
         const contentArea = document.getElementById('modal-content-area');
         const dlBtn = document.getElementById('modal-download');
+        const shareBtn = document.querySelector('#modal-actions button');
         
         contentArea.innerHTML = '';
         dlBtn.style.display = 'none'; 
-        
-        // Настраиваем кнопку поделиться
-        const shareBtn = document.querySelector('#modal-actions button');
         shareBtn.onclick = () => shareLink(item.id);
 
         if (item.type === 'text') {
-            // Если текст
             contentArea.innerHTML = `<div class="text-content-view">${item.content}</div>`;
         } else {
-            // Если файл
             dlBtn.style.display = 'inline-block';
             dlBtn.href = item.url;
-            
             if(item.type === 'jpg' || item.type === 'png' || (item.type && item.type.includes('image'))) {
                 contentArea.innerHTML = `<div class="modal-preview"><img src="${item.url}" alt="preview"></div>`;
             } else {
                 contentArea.innerHTML = `<i class="fas fa-file-download" style="font-size: 5rem; color: #bdc3c7; margin: 30px 0;"></i>`;
             }
         }
-
         modal.style.display = 'flex';
     }
 
     function closeModal() {
         document.getElementById('modal').style.display = 'none';
-        // Очистка URL
         window.history.pushState({}, document.title, window.location.pathname);
     }
 
     function shareLink(id) {
         const link = `${window.location.origin}${window.location.pathname}?fileId=${id}`;
-        navigator.clipboard.writeText(link).then(() => alert('Ссылка скопирована в буфер обмена!'));
+        navigator.clipboard.writeText(link).then(() => alert('Ссылка скопирована!'));
+    }
+
+    function filterMaterials(cat) {
+        currentCategory = cat;
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        event.target.classList.add('active');
+        renderMaterials();
     }
 
     function checkUrlParams() {
@@ -471,106 +735,13 @@
         }
     }
 
-    // --- 5. Админка и Действия ---
-
-    function adminLogin() {
-        const login = prompt("Логин Администратора:");
-        if (!login) return;
-        const pass = prompt("Пароль:");
-        
-        if(login === "Gaponenko" && pass === "GaponenkoJ") {
-            isAdmin = true;
-            document.getElementById('admin-panel').style.display = 'block';
-            localStorage.setItem('auth', `${login}:${pass}`);
-            renderMaterials();
-            alert("Режим редактирования включен");
-        } else {
-            alert("Неверные данные");
-        }
-    }
-
-    async function uploadMaterial() {
-        const title = document.getElementById('file-title').value;
-        const category = document.getElementById('file-category').value;
-        const uploadType = document.querySelector('input[name="uploadType"]:checked').value;
-        
-        if(!title) return alert("Пожалуйста, введите название!");
-
-        const formData = new FormData();
-        formData.append('title', title);
-        formData.append('category', category);
-
-        if (uploadType === 'file') {
-            const file = document.getElementById('file-input').files[0];
-            if(!file) return alert("Выберите файл для загрузки!");
-            formData.append('file', file);
-            formData.append('isTextPost', 'false');
-        } else {
-            const textContent = document.getElementById('text-input').value;
-            if(!textContent) return alert("Введите текст статьи!");
-            formData.append('textContent', textContent);
-            formData.append('isTextPost', 'true');
-        }
-
-        // Показываем лоадер
-        document.getElementById('upload-loader').style.display = 'block';
-        const auth = localStorage.getItem('auth');
-
-        try {
-            const res = await fetch(`${API_URL}/api/upload`, {
-                method: 'POST',
-                headers: { 'Authorization': auth },
-                body: formData
-            });
-            
-            if(res.ok) {
-                alert("Материал успешно опубликован!");
-                // Очистка полей
-                document.getElementById('file-title').value = '';
-                document.getElementById('file-input').value = '';
-                document.getElementById('text-input').value = '';
-                fetchMaterials(); // Обновить список
-            } else {
-                const err = await res.json();
-                alert("Ошибка сервера: " + (err.error || "Unknown"));
-            }
-        } catch (e) {
-            alert("Ошибка сети. Проверьте интернет или статус сервера.");
-        } finally {
-            document.getElementById('upload-loader').style.display = 'none';
-        }
-    }
-
-    async function deleteFile(id, event) {
-        event.stopPropagation(); // Чтобы не открылась модалка при клике на крестик
-        if(!confirm("Вы уверены, что хотите удалить этот материал?")) return;
-        
-        const auth = localStorage.getItem('auth');
-        try {
-            const res = await fetch(`${API_URL}/api/delete/${id}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': auth }
-            });
-            if(res.ok) {
-                fetchMaterials();
-            } else {
-                alert("Не удалось удалить.");
-            }
-        } catch (e) {
-            alert("Ошибка сети");
-        }
-    }
-
-    // Автоматическая проверка авторизации (если страница перезагрузилась)
-    const savedAuth = localStorage.getItem('auth');
-    if(savedAuth === "Gaponenko:GaponenkoJ") {
+    // Проверка сохраненной сессии
+    if(localStorage.getItem('auth') === "Gaponenko:GaponenkoJ") {
         isAdmin = true;
         document.getElementById('admin-panel').style.display = 'block';
     }
 
-    // Старт
     fetchMaterials();
 </script>
 </body>
-
 </html>
