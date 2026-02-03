@@ -22,6 +22,7 @@
             color: #333;
         }
 
+        /* Шапка */
         header {
             background-color: var(--primary);
             color: white;
@@ -72,6 +73,7 @@
             border-bottom-color: var(--accent);
         }
 
+        /* Сетка */
         .grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
@@ -110,11 +112,12 @@
             -webkit-line-clamp: 2;
             -webkit-box-orient: vertical;
             overflow: hidden; 
+            word-break: break-word; /* Чтобы длинные ссылки не ломали карточку */
         }
         
         .card-meta { font-size: 0.8rem; color: #7f8c8d; }
 
-        /* --- Элементы Админки --- */
+        /* Админка */
         .card-actions {
             position: absolute;
             top: 10px;
@@ -244,11 +247,22 @@
             background: #f9f9f9;
             padding: 20px;
             border-radius: 5px;
-            white-space: pre-wrap;
+            white-space: pre-wrap; /* Сохраняет отступы */
             line-height: 1.6;
             margin-top: 15px;
             font-size: 1.1rem;
             border-left: 4px solid var(--accent);
+            word-wrap: break-word;
+        }
+        
+        /* Стили для ссылок внутри текста */
+        .text-content-view a, .card-title a, h2 a {
+            color: var(--accent);
+            text-decoration: underline;
+            font-weight: 500;
+        }
+        .text-content-view a:hover, .card-title a:hover, h2 a:hover {
+            color: var(--primary);
         }
 
         .modal-preview img {
@@ -270,7 +284,6 @@
             margin-top: 15px;
             font-size: 1rem;
         }
-
         .btn.cancel { background: #95a5a6; }
 
         .secret-login {
@@ -302,18 +315,16 @@
 </header>
 
 <div class="container">
-    <!-- ПАНЕЛЬ АДМИНИСТРАТОРА -->
     <div id="admin-panel">
         <div class="admin-header">
             <h3 id="form-title" style="margin:0;">Добавить материал</h3>
             <button class="logout-btn" onclick="adminLogout()">Выйти</button>
         </div>
         
-        <!-- Переключатель режима (скрывается при редактировании) -->
         <div class="type-switch" id="type-switch-container">
             <span>Тип:</span>
-            <label><input type="radio" name="uploadType" value="file" checked onclick="toggleInputType()"> Загрузка файлов (можно несколько)</label>
-            <label><input type="radio" name="uploadType" value="text" onclick="toggleInputType()"> Текстовая статья</label>
+            <label><input type="radio" name="uploadType" value="file" checked onclick="toggleInputType()"> Файлы</label>
+            <label><input type="radio" name="uploadType" value="text" onclick="toggleInputType()"> Статья / Текст</label>
         </div>
 
         <input type="text" id="file-title" placeholder="Название (для файлов это будет общим префиксом)">
@@ -325,15 +336,13 @@
             <option value="method">Методические рекомендации</option>
         </select>
 
-        <!-- Поле для ФАЙЛОВ (multiple) -->
         <div id="input-container-file">
             <input type="file" id="file-input" multiple>
-            <small style="color:#7f8c8d">Совет: Выберите сразу несколько файлов для поочередной загрузки.</small>
+            <small style="color:#7f8c8d">Совет: Выберите несколько файлов для загрузки по очереди.</small>
         </div>
 
-        <!-- Поле для ТЕКСТА -->
         <div id="input-container-text" style="display: none;">
-            <textarea id="text-input" placeholder="Введите текст, описание или лекцию..."></textarea>
+            <textarea id="text-input" placeholder="Введите текст. Ссылки станут кликабельными автоматически."></textarea>
         </div>
 
         <div style="margin-top: 10px;">
@@ -341,7 +350,6 @@
             <button id="cancel-edit-btn" class="btn cancel" style="display:none;" onclick="cancelEditMode()">Отмена</button>
         </div>
 
-        <!-- Прогресс бар -->
         <div id="progress-container">
             <div id="progress-text">Загрузка...</div>
             <div class="progress-bar-bg">
@@ -350,13 +358,11 @@
         </div>
     </div>
 
-    <!-- Сетка -->
     <div id="materials-grid" class="grid">
         <p style="text-align:center; width: 100%; color: #999;">Загрузка...</p>
     </div>
 </div>
 
-<!-- МОДАЛЬНОЕ ОКНО ПРОСМОТРА -->
 <div class="modal-overlay" id="modal" onclick="if(event.target === this) closeModal()">
     <div class="modal">
         <span class="close-modal" onclick="closeModal()">&times;</span>
@@ -372,13 +378,38 @@
 <div class="secret-login" onclick="adminLogin()">π</div>
 
 <script>
-    // ВСТАВЬ СЮДА ССЫЛКУ С RENDER (БЕЗ СЛЕША В КОНЦЕ)
+    // --- ВСТАВЬ ССЫЛКУ С RENDER (БЕЗ СЛЕША) ---
     const API_URL = "https://historyizt.onrender.com"; 
 
     let allMaterials = {};
     let currentCategory = 'lectures';
     let isAdmin = false;
-    let editModeId = null; // ID редактируемого элемента
+    let editModeId = null;
+
+    // --- ФУНКЦИЯ ДЛЯ ПРЕВРАЩЕНИЯ ССЫЛОК В HTML ---
+    function autoLink(text) {
+        if (!text) return "";
+        // 1. Защита от XSS (заменяем < на безопасный код), чтобы не вставили скрипт
+        let safeText = text.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        
+        // 2. Регулярка для поиска URL (http, https, www)
+        const urlRegex = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/ig;
+        
+        // 3. Замена URL на тег <a>
+        // onclick="event.stopPropagation()" нужен, чтобы при клике на ссылку в карточке не открывалась модалка
+        safeText = safeText.replace(urlRegex, function(url) {
+            return `<a href="${url}" target="_blank" onclick="event.stopPropagation()">${url}</a>`;
+        });
+
+        // 4. Замена переносов строк на <br> (только для текста статей)
+        return safeText;
+    }
+    
+    // Специальная версия для текста статей (сохраняет Enter)
+    function autoLinkTextBody(text) {
+        let linked = autoLink(text);
+        return linked.replace(/\n/g, "<br>");
+    }
 
     // --- UI Логика ---
     function toggleInputType() {
@@ -392,7 +423,6 @@
         }
     }
 
-    // --- Основной процесс ---
     async function fetchMaterials() {
         try {
             const response = await fetch(`${API_URL}/api/materials`);
@@ -429,7 +459,6 @@
             const card = document.createElement('div');
             card.className = 'card';
             
-            // Кнопки админа
             let adminActions = '';
             if (isAdmin) {
                 adminActions = `
@@ -439,33 +468,29 @@
                 </div>`;
             }
 
+            // Используем autoLink для заголовка, чтобы ссылки в названии были кликабельны
             card.innerHTML = `
                 ${adminActions}
                 <i class="fas ${icon} card-icon"></i>
-                <div class="card-title">${item.title}</div>
+                <div class="card-title">${autoLink(item.title)}</div>
                 <div class="card-meta">
                     ${ext === 'text' ? 'Статья' : ext.toUpperCase()} • ${new Date(item.createdAt).toLocaleDateString()}
                 </div>
             `;
             
             card.onclick = (e) => {
-                // Если клик не по кнопкам админа
-                if(!e.target.closest('.action-btn')) openModal(item);
+                // Если кликнули не по кнопкам и не по ссылке
+                if(!e.target.closest('.action-btn') && e.target.tagName !== 'A') openModal(item);
             };
             grid.appendChild(card);
         });
     }
 
-    // --- Обработка формы (Добавление / Редактирование) ---
     async function processSubmit() {
-        if (editModeId) {
-            await updateMaterial();
-        } else {
-            await uploadQueue();
-        }
+        if (editModeId) await updateMaterial();
+        else await uploadQueue();
     }
 
-    // --- 1. Логика Мульти-загрузки ---
     async function uploadQueue() {
         const titleBase = document.getElementById('file-title').value;
         const category = document.getElementById('file-category').value;
@@ -474,7 +499,6 @@
 
         if(!titleBase) return alert("Введите название!");
 
-        // Если это текстовый пост
         if (uploadType === 'text') {
             const textContent = document.getElementById('text-input').value;
             if(!textContent) return alert("Введите текст!");
@@ -489,7 +513,6 @@
             return;
         }
 
-        // Если это файлы
         const files = document.getElementById('file-input').files;
         if(files.length === 0) return alert("Выберите файлы!");
 
@@ -499,7 +522,6 @@
         
         progressContainer.style.display = 'block';
 
-        // Цикл по файлам (по очереди)
         for (let i = 0; i < files.length; i++) {
             const file = files[i];
             const currentNum = i + 1;
@@ -510,7 +532,6 @@
             progressBar.style.width = `${percent}%`;
 
             const formData = new FormData();
-            // Если файлов много, добавляем номер к названию, если один - оставляем как есть
             const finalTitle = total > 1 ? `${titleBase} (${currentNum})` : titleBase;
             
             formData.append('title', finalTitle);
@@ -549,7 +570,6 @@
         }
     }
 
-    // --- 2. Логика Редактирования ---
     function startEdit(id, event) {
         event.stopPropagation();
         const items = Object.values(allMaterials);
@@ -557,14 +577,11 @@
         if(!item) return;
 
         editModeId = id;
-        
-        // Заполняем форму
         document.getElementById('file-title').value = item.title;
         document.getElementById('file-category').value = item.category;
         
-        // Меняем UI
-        document.getElementById('form-title').innerText = "Редактирование материала";
-        document.getElementById('submit-btn').innerText = "Сохранить изменения";
+        document.getElementById('form-title').innerText = "Редактирование";
+        document.getElementById('submit-btn').innerText = "Сохранить";
         document.getElementById('cancel-edit-btn').style.display = "inline-block";
         document.getElementById('type-switch-container').style.display = "none";
         document.getElementById('input-container-file').style.display = "none";
@@ -575,21 +592,16 @@
         } else {
             document.getElementById('input-container-text').style.display = "none";
         }
-        
-        // Скроллим к форме
         document.getElementById('admin-panel').scrollIntoView({ behavior: 'smooth' });
     }
 
     async function updateMaterial() {
         const title = document.getElementById('file-title').value;
         const category = document.getElementById('file-category').value;
-        const content = document.getElementById('text-input').value; // Берем текст, если он есть
+        const content = document.getElementById('text-input').value;
         const auth = localStorage.getItem('auth');
 
         const bodyData = { title, category };
-        
-        // Если это был текстовый пост, обновляем и текст
-        // Определяем тип по UI (если поле текста видимо)
         if(document.getElementById('input-container-text').style.display !== 'none') {
              bodyData.content = content;
         }
@@ -603,7 +615,6 @@
                 },
                 body: JSON.stringify(bodyData)
             });
-            
             if(res.ok) {
                 alert("Обновлено!");
                 cancelEditMode();
@@ -625,42 +636,33 @@
         document.getElementById('file-title').value = '';
         document.getElementById('file-input').value = '';
         document.getElementById('text-input').value = '';
-        
-        // Возвращаем UI в режим добавления
         document.getElementById('form-title').innerText = "Добавить материал";
         document.getElementById('submit-btn').innerText = "Опубликовать";
         document.getElementById('cancel-edit-btn').style.display = "none";
         document.getElementById('type-switch-container').style.display = "flex";
-        toggleInputType(); // Сброс видимости полей
+        toggleInputType();
     }
 
-    // --- 3. Логика Удаления (Синхронно) ---
     async function deleteMaterial(id, event) {
         event.stopPropagation();
-        if(!confirm("Вы уверены? Файл удалится из архива навсегда.")) return;
-        
+        if(!confirm("Вы уверены?")) return;
         const auth = localStorage.getItem('auth');
         try {
             const res = await fetch(`${API_URL}/api/delete/${id}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': auth }
             });
-            if(res.ok) {
-                fetchMaterials();
-            } else {
-                alert("Ошибка удаления");
-            }
+            if(res.ok) fetchMaterials();
+            else alert("Ошибка удаления");
         } catch (e) {
             alert("Ошибка сети");
         }
     }
 
-    // --- Авторизация ---
     function adminLogin() {
         const login = prompt("Логин:");
         if (!login) return;
         const pass = prompt("Пароль:");
-        
         if(login === "Gaponenko" && pass === "GaponenkoJ") {
             isAdmin = true;
             document.getElementById('admin-panel').style.display = 'block';
@@ -678,10 +680,10 @@
         renderMaterials();
     }
 
-    // --- Модальное окно и прочее ---
     function openModal(item) {
         const modal = document.getElementById('modal');
-        document.getElementById('modal-title').innerText = item.title;
+        // Заголовок тоже прогоняем через autoLink
+        document.getElementById('modal-title').innerHTML = autoLink(item.title);
         const contentArea = document.getElementById('modal-content-area');
         const dlBtn = document.getElementById('modal-download');
         const shareBtn = document.querySelector('#modal-actions button');
@@ -691,7 +693,8 @@
         shareBtn.onclick = () => shareLink(item.id);
 
         if (item.type === 'text') {
-            contentArea.innerHTML = `<div class="text-content-view">${item.content}</div>`;
+            // Тут используем autoLinkTextBody (с переносами строк)
+            contentArea.innerHTML = `<div class="text-content-view">${autoLinkTextBody(item.content)}</div>`;
         } else {
             dlBtn.style.display = 'inline-block';
             dlBtn.href = item.url;
@@ -735,7 +738,6 @@
         }
     }
 
-    // Проверка сохраненной сессии
     if(localStorage.getItem('auth') === "Gaponenko:GaponenkoJ") {
         isAdmin = true;
         document.getElementById('admin-panel').style.display = 'block';
@@ -745,4 +747,3 @@
 </script>
 </body>
 </html>
-
